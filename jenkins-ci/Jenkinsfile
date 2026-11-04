@@ -1,6 +1,11 @@
 pipeline {
   agent any
 
+  parameters {
+    booleanParam(name: 'FORCE_FAIL', defaultValue: false,
+                 description: 'Tick to simulate a failure and test the Slack alert')
+  }
+
   environment {
     IMAGE = 'task03-api'
   }
@@ -21,6 +26,24 @@ pipeline {
     stage('Verify') {
       steps {
         sh 'docker images $IMAGE'
+      }
+    }
+
+    stage('Simulated failure') {
+      when { expression { return params.FORCE_FAIL } }
+      steps {
+        error 'Simulated failure to test the notification'
+      }
+    }
+  }
+
+  post {
+    failure {
+      withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_URL')]) {
+        sh '''
+          MSG="Build FAILED: $JOB_NAME #$BUILD_NUMBER - $BUILD_URL"
+          curl -s -X POST -H "Content-type: application/json" --data "{\\"text\\":\\"$MSG\\"}" "$SLACK_URL"
+        '''
       }
     }
   }
