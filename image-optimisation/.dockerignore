@@ -1,0 +1,5 @@
+Dockerfile*
+SIZES.md
+__pycache__
+*.pyc
+.git
