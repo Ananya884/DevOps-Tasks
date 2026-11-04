@@ -1,0 +1,27 @@
+pipeline {
+  agent any
+
+  environment {
+    IMAGE = 'task03-api'
+  }
+
+  stages {
+    stage('Clone') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Build image') {
+      steps {
+        sh 'docker build -t $IMAGE:$BUILD_NUMBER api'
+      }
+    }
+
+    stage('Verify') {
+      steps {
+        sh 'docker images $IMAGE'
+      }
+    }
+  }
+}
