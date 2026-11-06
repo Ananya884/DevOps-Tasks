@@ -1,0 +1,110 @@
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'VERSION', defaultValue: '2', description: 'Version number the new release shows')
+    booleanParam(name: 'BREAK', defaultValue: false, description: 'Tick to ship a broken release and test the rollback')
+  }
+
+  environment {
+    IMAGE = 'bg-app'
+  }
+
+  stages {
+    stage('Clone') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Build image') {
+      steps {
+        sh 'docker build -t $IMAGE:$BUILD_NUMBER blue-green/app'
+      }
+    }
+
+    stage('Find live colour') {
+      steps {
+        script {
+          def live = sh(script: "docker exec proxy cat /etc/nginx/conf.d/upstream.conf | grep -oE 'blue|green' | head -1", returnStdout: true).trim()
+          env.LIVE = live
+          env.IDLE = (live == 'blue') ? 'green' : 'blue'
+          echo "Live is ${env.LIVE}. Deploying the new version to ${env.IDLE}."
+        }
+      }
+    }
+
+    stage('Deploy to idle') {
+      steps {
+        sh '''
+          docker rm -f $IDLE || true
+          BREAK_FLAG=0
+          if [ "${BREAK:-false}" = "true" ]; then BREAK_FLAG=1; fi
+          docker run -d --name $IDLE --network bgnet -e APP_VERSION=${VERSION:-2} -e APP_COLOR=$IDLE -e BREAK=$BREAK_FLAG $IMAGE:$BUILD_NUMBER
+        '''
+      }
+    }
+
+    stage('Smoke test') {
+      steps {
+        sh '''
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if docker exec $IDLE wget -q -O /dev/null http://localhost:8000/health; then
+              echo "Smoke test passed"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 2
+          done
+          echo "Smoke test FAILED"
+          exit 1
+        '''
+      }
+    }
+
+    stage('Switch traffic') {
+      steps {
+        sh '''
+          docker exec proxy sh -c "echo 'upstream app { server $IDLE:8000; }' > /etc/nginx/conf.d/upstream.conf"
+          docker exec proxy nginx -t
+          docker exec proxy nginx -s reload
+        '''
+      }
+    }
+
+    stage('Verify live') {
+      steps {
+        sh '''
+          sleep 1
+          OUT=$(curl -s http://localhost:9000)
+          echo "Visitors now see: $OUT"
+          echo "$OUT" | grep -q "on $IDLE"
+        '''
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Release is live on ${env.IDLE}. ${env.LIVE} stays running as the standby."
+    }
+    failure {
+      script {
+        if (env.LIVE) {
+          sh '''
+            echo "ROLLBACK: putting traffic back on $LIVE"
+            docker exec proxy sh -c "echo 'upstream app { server $LIVE:8000; }' > /etc/nginx/conf.d/upstream.conf" || true
+            docker exec proxy nginx -s reload || true
+            docker rm -f $IDLE || true
+          '''
+        }
+      }
+      withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_URL')]) {
+        sh '''
+          MSG="Release FAILED and was rolled back: $JOB_NAME #$BUILD_NUMBER - $BUILD_URL"
+          curl -s -X POST -H "Content-type: application/json" --data "{\\"text\\":\\"$MSG\\"}" "$SLACK_URL"
+        '''
+      }
+    }
+  }
+}
