@@ -40,3 +40,4 @@ After a good release the old colour stays running as a standby.
   container, `localhost` resolved to the IPv6 address `::1` first, and the app
   listened only on IPv4. Fixed by testing `127.0.0.1` explicitly. The rollback
   still worked, which showed the safety net does its job.
+
