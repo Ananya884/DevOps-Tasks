@@ -35,3 +35,4 @@ purpose and `Build FAILED: <job> #<n> - <url>` arrives in Slack.
   threshold. Fixed by enlarging /tmp and lowering the threshold.
 - **Jenkins unreachable after a few hours:** my public IP had changed, so the
   security group rules (restricted to my IP) dropped traffic. Updated the rules.
+
