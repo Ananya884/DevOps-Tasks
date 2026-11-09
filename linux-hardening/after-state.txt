@@ -1,0 +1,32 @@
+== SSH settings ==
+port 22
+maxauthtries 3
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication no
+kbdinteractiveauthentication no
+
+== Firewall ==
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere                   # SSH
+9000/tcp                   ALLOW IN    Anywhere                   # proxy container
+22/tcp (v6)                ALLOW IN    Anywhere (v6)              # SSH
+9000/tcp (v6)              ALLOW IN    Anywhere (v6)              # proxy container
+
+
+== fail2ban ==
+active
+Status for the jail: sshd
+   |- Currently banned:	0
+   |- Total banned:	0
+
+== unattended-upgrades ==
+enabled
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";

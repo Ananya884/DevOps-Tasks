@@ -1,0 +1,19 @@
+== User and OS ==
+ubuntu
+PRETTY_NAME="Ubuntu 26.04.1 LTS"
+NAME="Ubuntu"
+
+== SSH settings ==
+port 22
+permitrootlogin prohibit-password
+pubkeyauthentication yes
+passwordauthentication no
+
+== Firewall ==
+Status: inactive
+
+== fail2ban ==
+inactive
+
+== unattended-upgrades ==
+1
